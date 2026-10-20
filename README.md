@@ -1,9 +1,9 @@
 - URL site WEB :
-- URL Notebook Observable :
-- Nom :
-- Prénom :
-- Nom binome :
-- Prénom binome :
+- URL Notebook Observable : https://observablehq.com/@mmi-montbeliard/sae-303-gr-11/2
+- Nom : Mettetal
+- Prénom : Charlotte 
+- Nom binome : Chouhib
+- Prénom binome : Yanis
 
 # Remarques :
 

@@ -1,8 +1,90 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Header from "../components/Header.astro";
+import PlotFigure from "../components/PlotFigure.astro";
+import * as Plot from "@observablehq/plot";
+import ConsommationConversation from "../assets/ConsommationConversation.json";
+
+const donneesTransformees = ConsommationConversation
+    .flatMap((d) => [
+        { nom_modele: d.modelA, consommation: +d.consommationA },
+        { nom_modele: d.modelB, consommation: +d.consommationB },
+    ])
+    .filter((d) => d.consommation > 0);
 ---
 
 <Layout>
-    <Header/>
+    <Header />
+    <main
+        class="min-h-screen bg-slate-50 px-4 py-10 text-slate-800 sm:px-6 lg:py-16"
+    >
+        <section
+            class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10"
+        >
+            <div class="mb-2 max-w-3xl">
+                <p
+                    class="mb-2 text-sm font-semibold uppercase tracking-wider text-orange-600"
+                >
+                    L'histogramme des modèles d'IA
+                </p>
+                <h2 class="text-2xl font-bold text-slate-800 sm:text-3xl">
+                    Le top 25 des IA les plus énergivores
+                </h2>
+            </div>
+
+            <div
+                class="grid items-center gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12"
+            >
+                <div class="max-w-xl">
+                    <p class="text-lg leading-8 text-slate-600">
+                        Le modèle le plus énergivore est Mistral-large-4-0 avec
+                        une consommation par requête hors norme qui écrase
+                        comptétement le reste du classement
+                    </p>
+                    <p class="mt-5 leading-7 text-slate-500">
+                        Regarder l'histogramme et constater par vous même quels
+                        sont les modèle les plus énergivore.
+                    </p>
+
+                    <p class="mt-2 text-xs text-slate-600">
+                        Sources : données issues du Ministère de la Culture,
+                        datant du 17 octobre 2026.
+                    </p>
+                </div>
+                <div class="min-w-0 overflow-x-auto">
+                    <PlotFigure
+                        options={{
+                            title: "Le top 25 des modèles les plus énergivores",
+                            marginLeft: 150,
+                            height: 600,
+
+                            x: {
+                                label: "Consommation moyenne (MWh) →",
+                                domain: [0, 0.05],
+                            },
+                            y: {
+                                label: "Modèle IA",
+                            },
+
+                            marks: [
+                                Plot.barX(
+                                    donneesTransformees,
+                                    Plot.groupY(
+                                        { x: "mean" },
+                                        {
+                                            x: "consommation",
+                                            y: "nom_modele",
+                                            fill: "green",
+                                            sort: { y: "x", reverse: true, limit: 25 },
+                                        },
+                                    ),
+                                ),
+                                Plot.ruleX([0]),
+                            ],
+                        }}
+                    />
+                </div>
+            </div>
+        </section>
+    </main>
 </Layout>

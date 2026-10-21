@@ -5,6 +5,7 @@ import PlotFigure from "../components/PlotFigure.astro";
 import * as Plot from "@observablehq/plot";
 import ConsommationConversation from "../assets/ConsommationConversation.json";
 
+
 const donneesTransformees = ConsommationConversation.flatMap((d) => [
     { nom_modele: d.modelA, consommation: +d.consommationA },
     { nom_modele: d.modelB, consommation: +d.consommationB },
@@ -26,7 +27,7 @@ const donneesTransformees = ConsommationConversation.flatMap((d) => [
                     L'histogramme des modèles d'IA
                 </p>
                 <h2 class="text-2xl font-bold text-slate-800 sm:text-3xl">
-                    Quel est le modèle IA le plus énergivore ?
+                    Le top 25 des modèles les plus énergivores
                 </h2>
             </div>
 
@@ -34,14 +35,13 @@ const donneesTransformees = ConsommationConversation.flatMap((d) => [
                 class="grid items-center gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12"
             >
                 <div class="max-w-xl">
-                    <p class="text-lg leading-8 text-slate-600">
-                        Le modèle le plus énergivore est Mistral-large-4-0 avec
-                        une consommation par requête hors norme qui écrase
-                        comptétement le reste du classement
+                    <p class="text-lg font-bold leading-8 text-slate-600">
+                        Quel est le modèle IA le plus énergivore ?
                     </p>
                     <p class="mt-5 leading-7 text-slate-500">
-                        Regarder l'histogramme et constater par vous même quels
-                        sont les modèles les plus énergivores.
+                        Le modèle le plus énergivore est Mistral-large-4-0 avec
+                        une consommation par requête hors norme qui écrase
+                        complètement le reste du classement.
                     </p>
 
                     <p class="mt-2 text-xs text-slate-600">
@@ -56,7 +56,6 @@ const donneesTransformees = ConsommationConversation.flatMap((d) => [
                 <div class="min-w-0 overflow-x-auto">
                     <PlotFigure
                         options={{
-                            title: "Le top 25 des modèles les plus énergivores",
                             marginLeft: 150,
                             height: 600,
 
@@ -137,6 +136,60 @@ const donneesTransformees = ConsommationConversation.flatMap((d) => [
                     </figcaption>
                 </figure>
             </div>
+        </section>
+        <section
+            class="mt-10 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10"
+        >
+            <div class="mb-2 max-w-3xl">
+                <p
+                    class="mb-2 text-sm font-semibold uppercase tracking-wider text-orange-600"
+                >
+                    La comparaison
+                </p>
+                <h2 class="text-2xl font-bold text-slate-800 sm:text-3xl">
+                    Consommation de l'IA comparée à celle de l'électroménager
+                    du quotidien
+                </h2>
+                <p class="mt-3 text-lg font-bold leading-8 text-slate-600">
+                    Intelligence artificielle ou électroménager : qui est le
+                    plus gourmand en électricité ?
+                </p>
+                <p class="mt-5 leading-7 text-slate-500">
+                    Évaluez l'impact énergétique d'un modèle d'IA (ex :
+                    gemini-3.1-pro-preview) face à vos appareils du quotidien.
+                </p>
+            </div>
+
+            <div class="mb-6 flex flex-wrap gap-6">
+                <label class="grid gap-1 text-sm font-medium text-slate-700">
+                    Appareil
+                    <select
+                        id="v4-appareil"
+                        class="rounded-lg border border-slate-300 px-3 py-2"
+                    ></select>
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700">
+                    Modèle d'IA
+                    <select
+                        id="v4-modele"
+                        class="rounded-lg border border-slate-300 px-3 py-2"
+                    ></select>
+                </label>
+            </div>
+
+            <p id="v4-phrase" class="text-lg leading-8 text-slate-800"></p>
+            <p id="v4-detail" class="mt-1 text-sm text-slate-500"></p>
+
+            <figure class="mt-6 min-w-0 overflow-x-auto">
+                <div id="v4"></div>
+                <figcaption class="mt-3 text-xs text-slate-600">
+                    Énergie d'une heure d'appareil (moyenne sur 24 h) comparée à
+                    celle d'une réponse du modèle choisi (médiane, estimation),
+                    en Wh, échelle logarithmique. Sources : ADEME le 29 janvier 2026 ; estimations Compar:IA, données
+                    récoltées par le Ministère de la Culture (dernière mise à
+                    jour le 20 octobre 2026).
+                </figcaption>
+            </figure>
         </section>
     </main>
 </Layout>
@@ -220,4 +273,112 @@ const donneesTransformees = ConsommationConversation.flatMap((d) => [
             ],
         }),
     );
+</script>
+
+<script>
+    import * as Plot from "@observablehq/plot";
+
+    const [conso, infos, appareilsBruts] = await Promise.all([
+        fetch("/data/ConsommationConversation.json").then((r) => r.json()),
+        fetch("/data/ConsommationModeles.json").then((r) => r.json()),
+        fetch("/data/consommation_electromenager.json").then((r) => r.json()),
+    ]);
+
+    const idDe = (x: any) => x.id ?? x.human_id;
+    const tailleDe = (x: any) => x.taille ?? x.size_class;
+    const classeDe = (x: any) => x.classeEnergie ?? x.energy_class;
+
+    const appareils = appareilsBruts
+        .map((d: any) => ({
+            appareil: d.appareil ?? d.nom,
+            wh: +(d.consommationMoyenne ?? d.wh ?? d["consommation_Wh/h"]),
+        }))
+        .filter((d: any) => d.appareil && d.wh > 0)
+        .sort((a: any, b: any) => a.appareil.localeCompare(b.appareil, "fr"));
+
+    const groupes = new Map<string, number[]>();
+    for (const d of conso.flatMap((d: any) => [
+        { nom: d.modelA, c: +d.consommationA },
+        { nom: d.modelB, c: +d.consommationB },
+    ])) {
+        if (!d.nom || !(d.c > 0)) continue;
+        if (!groupes.has(d.nom)) groupes.set(d.nom, []);
+        groupes.get(d.nom)!.push(d.c);
+    }
+
+    const modeles: any[] = [];
+    for (const [modele, v] of groupes) {
+        if (v.length < 10) continue;
+        v.sort((a: number, b: number) => a - b);
+        const med =
+            v.length % 2
+                ? v[(v.length - 1) / 2]
+                : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+        modeles.push({ modele, n: v.length, wh: med * 1000 }); // kWh → Wh
+    }
+    modeles.sort((a: any, b: any) => a.modele.localeCompare(b.modele, "fr"));
+
+    if (!appareils.length || !modeles.length)
+        console.warn("Graphique v4 vide : vérifier les champs des JSON");
+
+    const selA = document.querySelector("#v4-appareil") as HTMLSelectElement;
+    const selM = document.querySelector("#v4-modele") as HTMLSelectElement;
+    for (const d of appareils) selA.append(new Option(d.appareil, d.appareil));
+    for (const d of modeles) selM.append(new Option(d.modele, d.modele));
+
+    const nb = (x: number) =>
+        x.toLocaleString("fr-FR", { maximumFractionDigits: x < 10 ? 1 : 0 });
+
+    function dessiner() {
+        const a = appareils.find((d: any) => d.appareil === selA.value);
+        const m = modeles.find((d: any) => d.modele === selM.value);
+        if (!a || !m) return;
+        const eq = a.wh / m.wh;
+        const info = infos.find((x: any) => idDe(x) === m.modele) ?? {};
+
+        document.querySelector("#v4-phrase")!.innerHTML =
+            `1 heure de <b>${a.appareil}</b> équivaut à environ <b>${nb(eq)}</b> réponses de <b>${m.modele}</b>.`;
+        document.querySelector("#v4-detail")!.textContent =
+            `Modèle : taille ${tailleDe(info) ?? "non renseignée"}, classe énergétique ${classeDe(info) ?? "non renseignée"} (médiane de ${m.n} mesures).`;
+
+        document.querySelector("#v4")!.replaceChildren(
+            Plot.plot({
+                height: 240,
+                marginLeft: 200,
+                ariaLabel: `Comparaison sur une échelle logarithmique : une heure de ${a.appareil} consomme ${a.wh.toFixed(1)} Wh, une réponse de ${m.modele} consomme ${m.wh.toFixed(3)} Wh, soit un rapport de ${nb(eq)}.`,
+                x: {
+                    type: "log",
+                    domain: [0.001, 10000],
+                    label: "Énergie (Wh, échelle logarithmique) →",
+                    grid: true,
+                },
+                y: { label: null },
+                color: {
+                    legend: false,
+                    domain: ["appareil", "ia"],
+                    range: ["#9AA5A8", "#238B45"],
+                },
+                                              marks: [
+                    Plot.dot(
+                        [
+                            { label: `1 h de ${a.appareil}`, wh: a.wh, type: "appareil" },
+                            { label: `1 réponse (${m.modele})`, wh: m.wh, type: "ia" },
+                        ],
+                        {
+                            x: "wh",
+                            y: "label",
+                            r: 8,
+                            fill: "type",
+                            title: (d: any) => `${d.label} : ${d.wh.toFixed(3)} Wh`,
+                        },
+                    ),
+                ],
+                   
+            }),
+        );
+    }
+
+    selA.addEventListener("change", dessiner);
+    selM.addEventListener("change", dessiner);
+    dessiner();
 </script>

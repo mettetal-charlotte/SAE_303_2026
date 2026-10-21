@@ -1,4 +1,4 @@
-- URL site WEB :
+- URL site WEB : https://sae-303-mettetal-chouhib.netlify.app/
 - URL Notebook Observable : https://observablehq.com/@mmi-montbeliard/sae-303-gr-11/2
 - Nom : Mettetal
 - Prénom : Charlotte 

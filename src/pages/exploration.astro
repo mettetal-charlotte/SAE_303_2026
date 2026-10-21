@@ -5,12 +5,10 @@ import PlotFigure from "../components/PlotFigure.astro";
 import * as Plot from "@observablehq/plot";
 import ConsommationConversation from "../assets/ConsommationConversation.json";
 
-const donneesTransformees = ConsommationConversation
-    .flatMap((d) => [
-        { nom_modele: d.modelA, consommation: +d.consommationA },
-        { nom_modele: d.modelB, consommation: +d.consommationB },
-    ])
-    .filter((d) => d.consommation > 0);
+const donneesTransformees = ConsommationConversation.flatMap((d) => [
+    { nom_modele: d.modelA, consommation: +d.consommationA },
+    { nom_modele: d.modelB, consommation: +d.consommationB },
+]).filter((d) => d.consommation > 0);
 ---
 
 <Layout>
@@ -43,12 +41,16 @@ const donneesTransformees = ConsommationConversation
                     </p>
                     <p class="mt-5 leading-7 text-slate-500">
                         Regarder l'histogramme et constater par vous même quels
-                        sont les modèle les plus énergivore.
+                        sont les modèles les plus énergivores.
                     </p>
 
                     <p class="mt-2 text-xs text-slate-600">
-                        Sources : données issues du Ministère de la Culture,
-                        datant du 17 octobre 2026.
+                        Sources : données récoltées par le Ministère de la
+                        Culture, mises à jour tous les jours (dernière mise à
+                        jour le 20 octobre 2026). Ce jeu de données ne précise
+                        ni l'énergie utilisée pour entraîner les modèles, ni la
+                        localisation des data centers (en France ou non), ni
+                        l'unité des valeurs de consommation.
                     </p>
                 </div>
                 <div class="min-w-0 overflow-x-auto">
@@ -59,7 +61,7 @@ const donneesTransformees = ConsommationConversation
                             height: 600,
 
                             x: {
-                                label: "Consommation moyenne (MWh) →",
+                                label: "Consommation moyenne  →",
                                 domain: [0, 0.05],
                             },
                             y: {
@@ -75,7 +77,11 @@ const donneesTransformees = ConsommationConversation
                                             x: "consommation",
                                             y: "nom_modele",
                                             fill: "green",
-                                            sort: { y: "x", reverse: true, limit: 25 },
+                                            sort: {
+                                                y: "x",
+                                                reverse: true,
+                                                limit: 25,
+                                            },
                                         },
                                     ),
                                 ),
@@ -86,5 +92,132 @@ const donneesTransformees = ConsommationConversation
                 </div>
             </div>
         </section>
+        <section
+            class="mt-10 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10"
+        >
+            <div class="mb-2 max-w-3xl">
+                <p
+                    class="mb-2 text-sm font-semibold uppercase tracking-wider text-orange-600"
+                >
+                    L'évolution dans le temps
+                </p>
+                <h2 class="text-2xl font-bold text-slate-800 sm:text-3xl">
+                    Consommation énergétique d'une réponse d'IA selon sa taille
+                    et date de sortie
+                </h2>
+            </div>
+
+            <div
+                class="grid items-center gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12"
+            >
+                <div class="max-w-xl">
+                    <p class="text-lg font-bold leading-8 text-slate-600">
+                        La consommation énergétique d'un modèle d'IA est-elle
+                        liée à sa date de sortie ?
+                    </p>
+                    <p class="mt-5 leading-7 text-slate-500">
+                        Les modèles les plus récents sont en majorité ceux qui
+                        consomment le plus. On peut voir une absence de modèles
+                        XS ou S depuis 2026 et une accumulation de modèles L et
+                        XL.
+                    </p>
+                    <p class="mt-2 text-xs text-slate-600">
+                        Sources : estimations Compar:IA, données récoltées par
+                        le Ministère de la Culture, mises à jour tous les jours
+                        (dernière mise à jour le 20 octobre 2026).
+                    </p>
+                </div>
+                <figure class="min-w-0 overflow-x-auto">
+                    <div id="v3"></div>
+                    <figcaption class="mt-3 text-xs text-slate-600">
+                        Un point par modèle d'IA. Consommation médiane par
+                        réponse en Wh, échelle logarithmique ; couleur : taille
+                        du modèle. Estimations Compar:IA (modèles ayant au moins
+                        10 mesures).
+                    </figcaption>
+                </figure>
+            </div>
+        </section>
     </main>
 </Layout>
+
+<script>
+    import * as Plot from "@observablehq/plot";
+
+    const [conso, infos] = await Promise.all([
+        fetch("/data/ConsommationConversation.json").then((r) => r.json()),
+        fetch("/data/ConsommationModeles.json").then((r) => r.json()),
+    ]);
+
+    // accepte les deux nommages possibles
+    const idDe = (x: any) => x.id ?? x.human_id;
+    const sortieDe = (x: any) => x.sortie ?? x.release_date;
+    const tailleDe = (x: any) => x.taille ?? x.size_class;
+
+    const groupes = new Map<string, number[]>();
+    for (const d of conso.flatMap((d: any) => [
+        { nom: d.modelA, c: +d.consommationA },
+        { nom: d.modelB, c: +d.consommationB },
+    ])) {
+        if (!d.nom || !(d.c > 0)) continue;
+        if (!groupes.has(d.nom)) groupes.set(d.nom, []);
+        groupes.get(d.nom)!.push(d.c);
+    }
+
+    const parModele: any[] = [];
+    for (const [nom, v] of groupes) {
+        if (v.length < 10) continue;
+        const info = infos.find((x: any) => idDe(x) === nom);
+        const sortie = info && sortieDe(info);
+        if (!sortie) continue;
+        v.sort((a: number, b: number) => a - b);
+        const med =
+            v.length % 2
+                ? v[(v.length - 1) / 2]
+                : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+        parModele.push({
+            nom,
+            n: v.length,
+            wh: med * 1000, // kWh → Wh
+            sortie: new Date(sortie),
+            taille: tailleDe(info) || "non renseignée",
+        });
+    }
+    if (!parModele.length)
+        console.warn(
+            "Graphique v3 vide : aucun modèle n'a d'id + date de sortie correspondant dans ConsommationModeles.json",
+        );
+
+    document.querySelector("#v3")!.append(
+        Plot.plot({
+            height: 500,
+            marginLeft: 60,
+            ariaLabel:
+                "Nuage de points : chaque point est un modèle d'IA, placé selon sa date de sortie (de juillet 2024 à avril 2026) et sa consommation par réponse en Wh, de 0,03 à 5,92, sur une échelle logarithmique. La couleur indique la taille, de XS à XL. Les modèles XS et S sont en bas du graphique, les XL en haut, et les points sont répartis sur toute la période.",
+            x: { label: "Date de sortie →" },
+            y: { type: "log", label: "↑ Wh par réponse (médiane)", grid: true },
+            color: {
+                legend: true,
+                label: "Taille du modèle",
+                domain: ["XS", "S", "M", "L", "XL", "non renseignée"],
+                range: [
+                    "#A8DDB5",
+                    "#74C476",
+                    "#41AB5D",
+                    "#238B45",
+                    "#00441B",
+                    "#9AA5A8",
+                ],
+            },
+            marks: [
+                Plot.dot(parModele, {
+                    x: "sortie",
+                    y: "wh",
+                    fill: "taille",
+                    r: 5,
+                    title: (d: any) => `${d.nom} (${d.n} mesures)`,
+                }),
+            ],
+        }),
+    );
+</script>

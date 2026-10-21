@@ -1,6 +1,5 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import Header from "../components/Header.astro";
 import PlotFigure from "../components/PlotFigure.astro";
 import * as Plot from "@observablehq/plot";
 import ConsommationConversation from "../assets/ConsommationConversation.json";
@@ -13,7 +12,7 @@ const donneesTransformees = ConsommationConversation.flatMap((d) => [
 ---
 
 <Layout>
-    <Header />
+   
     <main
         class="min-h-screen bg-slate-50 px-4 py-10 text-slate-800 sm:px-6 lg:py-16"
     >
